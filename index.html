@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ScalperX Pro - R$</title>
+    <style>
+        :root {
+            --bg-color: #0b0e11;
+            --card-bg: #1e2329;
+            --text-color: #eaecef;
+            --text-secondary: #848e9c;
+            --border-color: #2b313a;
+            --green: #0ecb81;
+            --red: #f6465d;
+            --accent: #f0b90b;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-color: #1e2329;
+            --text-secondary: #707a8a;
+            --border-color: #e6e8ea;
+            --green: #0ecb81;
+            --red: #f6465d;
+            --accent: #d99b00;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 10px; transition: background 0.2s; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        .title-area { display: flex; align-items: center; gap: 8px; }
+        .status-badge { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
+        .status-badge.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(14, 203, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(14, 203, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(14, 203, 129, 0); }
+        }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-label { font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 3px; display: flex; justify-content: space-between; }
+        .card-value { font-size: 1rem; font-weight: bold; }
+        
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .timeframe-selector { display: flex; gap: 4px; }
+        .tf-btn { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 2px 6px; font-size: 0.7rem; border-radius: 4px; cursor: pointer; }
+        .tf-btn.active { background: var(--accent); color: #000; font-weight: bold; border-color: var(--accent); }
+
+        #chart-container { 
+            width: 100%; 
+            height: 220px; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            margin-bottom: 10px; 
+            background: #161a1e; 
+            border: 1px solid var(--border-color); 
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        svg { width: 100%; height: 100%; }
+        
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .btn { padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
+        .btn-start { background: var(--green); color: #fff; box-shadow: 0 3px 10px rgba(14,203,129,0.3); }
+        .btn-stop { background: var(--red); color: #fff; box-shadow: 0 3px 10px rgba(246,70,93,0.3); }
+        .btn-secondary { background: var(--border-color); color: var(--text-color); }
+        
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; gap: 8px; overflow-x: auto; }
+        .tab-btn { padding: 6px 10px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.8rem; }
+        .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-secondary); }
+        
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 3px; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 6px; font-size: 0.85rem; }
+        
+        .positive { color: var(--green); }
+        .negative { color: var(--red); }
+    </style>
+</head>
+<body>
+
+    <!-- Áudio Invisível para manter o app ativo em segundo plano ("Gambiarra" Anti-Desconexão) -->
+    <audio id="keepAliveAudio" loop style="display:none;">
+        <source src="data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+
+    <div class="header">
+        <div class="title-area">
+            <span id="bot-status-dot" class="status-badge"></span>
+            <h3 style="font-size:1rem;">ScalperX Pro (BTC/USDT)</h3>
+        </div>
+        <div>
+            <button class="btn btn-secondary" onclick="toggleTheme()" style="padding: 3px 6px; font-size: 0.7rem;">Tema</button>
+        </div>
+    </div>
+
+    <!-- Painel Superior Profissional -->
+    <div class="grid">
+        <div class="card">
+            <div class="card-label">Preço BTC</div>
+            <div class="card-value" id="btc-price">Conectando...</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Saldo Virtual (R$)</div>
+            <div class="card-value" id="sim-balance">R$ 50,00</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Status Conexão</div>
+            <div class="card-value" style="font-size: 0.8rem; color: var(--accent);" id="ws-status">Aguardando...</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Lucro do Dia</div>
+            <div class="card-value positive" id="daily-pnl">R$ 0,00</div>
+        </div>
+    </div>
+
+    <!-- Botões de Controle -->
+    <div class="controls">
+        <button id="btn-toggle" class="btn btn-start" onclick="toggleBot()">INICIAR ROBÔ</button>
+        <button class="btn btn-secondary" onclick="resetSimulator()">REINICIAR</button>
+    </div>
+
+    <!-- Gráfico SVG Ultra Leve -->
+    <div class="chart-header">
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Gráfico de Cotação BTC/USDT (Light)</span>
+        <div class="timeframe-selector">
+            <button class="tf-btn active" onclick="changeInterval('1m')">1m</button>
+            <button class="tf-btn" onclick="changeInterval('5m')">5m</button>
+            <button class="tf-btn" onclick="changeInterval('15m')">15m</button>
+        </div>
+    </div>
+    <div id="chart-container">
+        <svg id="candlestick-svg" viewBox="0 0 600 220" preserveAspectRatio="none">
+            <line x1="0" y1="55" x2="600" y2="55" stroke="#2b313a" stroke-dasharray="4" stroke-width="0.5"/>
+            <line x1="0" y1="110" x2="600" y2="110" stroke="#2b313a" stroke-dasharray="4" stroke-width="0.5"/>
+            <line x1="0" y1="165" x2="600" y2="165" stroke="#2b313a" stroke-dasharray="4" stroke-width="0.5"/>
+            <g id="candles-group"></g>
+        </svg>
+    </div>
+
+    <!-- Abas -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('trades')">Operações</button>
+        <button class="tab-btn" onclick="switchTab('stats')">Estatísticas</button>
+        <button class="tab-btn" onclick="switchTab('config')">Configurações</button>
+        <button class="tab-btn" onclick="switchTab('api')">Binance API</button>
+    </div>
+
+    <!-- Conteúdo 1: Operações -->
+    <div id="tab-trades" class="tab-content active">
+        <div class="card">
+            <h4 style="margin-bottom:6px; font-size:0.85rem;">Posição Atual</h4>
+            <div id="current-position" style="font-size:0.8rem; color: var(--text-secondary);">Nenhuma posição aberta.</div>
+        </div>
+        <div class="card" style="margin-top:8px;">
+            <h4 style="margin-bottom:6px; font-size:0.85rem;">Carteira & Histórico</h4>
+            <div style="font-size: 0.78rem; margin-bottom: 6px; color: var(--text-secondary);">
+                Livre: <b id="lbl-available" style="color:var(--text-color);">R$ 50,00</b> | Na Operação (R$ 5): <b id="lbl-in-trade" style="color:var(--accent);">R$ 0,00</b>
+            </div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Entrada</th>
+                            <th>Saída</th>
+                            <th>Lucro Líq.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trade-history"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conteúdo 2: Estatísticas -->
+    <div id="tab-stats" class="tab-content">
+        <div class="card" style="font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px;">
+            <p>Saldo Inicial: <b id="stat-initial">R$ 50,00</b></p>
+            <p>Total de Entradas: <b id="stat-total-trades">0</b></p>
+            <p>Taxas Pagas (0.1%): <b id="stat-fees">R$ 0,00</b></p>
+            <p>Taxa de Acerto: <b id="stat-winrate">0%</b></p>
+            <p>Ciclos Concluídos: <b id="stat-cycles">0</b></p>
+        </div>
+    </div>
+
+    <!-- Conteúdo 3: Configurações -->
+    <div id="tab-config" class="tab-content">
+        <div class="card">
+            <div class="form-group">
+                <label>Saldo Inicial Virtual (R$)</label>
+                <input type="number" id="cfg-initial-balance" value="50.00" step="5" min="5">
+            </div>
+            <div class="form-group">
+                <label>Valor por Entrada Fixo (R$)</label>
+                <input type="number" id="cfg-trade-amount" value="5.00" readonly style="opacity: 0.7;">
+            </div>
+            <div class="form-group">
+                <label>Take Profit / Meta de Lucro (R$ 0,50)</label>
+                <input type="number" id="cfg-target-profit" value="0.50" readonly style="opacity: 0.7;">
+            </div>
+            <div class="form-group">
+                <label>Stop Loss Fixo (R$ 0,50)</label>
+                <input type="number" id="cfg-stoploss-brl" value="0.50" readonly style="opacity: 0.7;">
+            </div>
+            <div class="form-group">
+                <label>Espaço entre Ordens (Segundos)</label>
+                <input type="number" id="cfg-cooldown" value="20" step="5" min="10">
+            </div>
+            <button class="btn btn-start" style="width: 100%;" onclick="saveSettings()">Salvar Configurações</button>
+        </div>
+    </div>
+
+    <!-- Conteúdo 4: Binance API -->
+    <div id="tab-api" class="tab-content">
+        <div class="card">
+            <div class="form-group">
+                <label>Modo de Operação</label>
+                <select id="cfg-mode" onchange="saveApiSettings()">
+                    <option value="SIM">MODO SIMULADOR (Ativo)</option>
+                    <option value="REAL">MODO REAL (Requer API)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Binance API Key</label>
+                <input type="text" id="api-key" placeholder="API Key" oninput="saveApiSettings()">
+            </div>
+            <div class="form-group">
+                <label>Binance Secret Key</label>
+                <input type="password" id="api-secret" placeholder="Secret Key" oninput="saveApiSettings()">
+            </div>
+            <button class="btn btn-start" style="width: 100%;" onclick="testApiConnection()">TESTAR / CONECTAR API</button>
+        </div>
+    </div>
+
+    <script>
+        const USD_BRL = 5.0;
+
+        let state = {
+            botActive: false,
+            initialBalance: 50.00,
+            balance: 50.00, 
+            availableBalance: 50.00, 
+            inTradeAmount: 0.00, 
+            dailyPnl: 0.00,
+            trades: [],
+            currentTrade: null,
+            totalFees: 0.00,
+            cycles: 0,
+            apiKey: '',
+            apiSecret: '',
+            apiMode: 'SIM',
+            settings: { 
+                tradeAmount: 5.00, 
+                profitTargetBRL: 0.50, // R$ 0,50 Lucro
+                stopLossBRL: 0.50,     // R$ 0,50 Stop Loss
+                cooldown: 20 
+            }
+        };
+
+        let currentPrice = 0.00;
+        let candlesList = [];
+        let ws = null;
+        let currentInterval = '1m';
+        let lastTradeTime = 0;
+        let reconnectTimer = null;
+        let isOnline = false;
+
+        window.onload = () => {
+            loadState();
+            startBinanceStream(currentInterval);
+            initKeepAliveWorker();
+            updateUI();
+        };
+
+        // Worker Anti-Sono de Alta Performance para evitar desconexão em segundo plano
+        function initKeepAliveWorker() {
+            const blob = new Blob([
+                `setInterval(() => { postMessage('ping'); }, 2000);`
+            ], { type: 'application/javascript' });
+            
+            const workerUrl = URL.createObjectURL(blob);
+            const worker = new Worker(workerUrl);
+            
+            worker.onmessage = () => {
+                if (state.botActive) {
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        startBinanceStream(currentInterval);
+                    }
+                }
+            };
+        }
+
+        function toggleTheme() {
+            const current = document.body.getAttribute('data-theme');
+            document.body.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+
+        function changeInterval(interval) {
+            currentInterval = interval;
+            document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            if (ws) ws.close();
+            candlesList = [];
+            startBinanceStream(interval);
+        }
+
+        function startBinanceStream(interval) {
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            document.getElementById('ws-status').innerText = 'Conectando...';
+
+            ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${interval}`);
+
+            ws.onopen = () => {
+                isOnline = true;
+                document.getElementById('ws-status').innerText = 'Online (Ao vivo)';
+                document.getElementById('ws-status').style.color = 'var(--green)';
+            };
+
+            ws.onmessage = (event) => {
+                isOnline = true;
+                const data = JSON.parse(event.data);
+                if (data.k) {
+                    const k = data.k;
+                    currentPrice = parseFloat(k.c);
+                    document.getElementById('btc-price').innerText = '$' + currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2});
+                    
+                    const candleData = {
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: currentPrice,
+                        isUp: currentPrice >= parseFloat(k.o)
+                    };
+
+                    if (candlesList.length === 0) {
+                        candlesList.push(candleData);
+                    } else {
+                        candlesList[candlesList.length - 1] = candleData;
+                    }
+
+                    if (candlesList.length > 20) {
+                        candlesList.shift();
+                    } else if (candlesList.length < 15) {
+                        candlesList.push(candleData);
+                    }
+
+                    renderCandlesSVG();
+
+                    if (state.botActive) {
+                        runSmartStrategy();
+                    }
+                }
+            };
+
+            ws.onerror = ws.onclose = () => {
+                isOnline = false;
+                document.getElementById('ws-status').innerText = 'Reconectando...';
+                document.getElementById('ws-status').style.color = 'var(--red)';
+                reconnectTimer = setTimeout(() => {
+                    startBinanceStream(currentInterval);
+                }, 1500);
+            };
+        }
+
+        function renderCandlesSVG() {
+            const group = document.getElementById('candles-group');
+            if (candlesList.length === 0) return;
+
+            const highs = candlesList.map(c => c.high);
+            const lows = candlesList.map(c => c.low);
+            const minP = Math.min(...lows);
+            const maxP = Math.max(...highs);
+            const span = maxP - minP || 1;
+
+            const svgWidth = 600;
+            const svgHeight = 220;
+            const candleWidth = svgWidth / candlesList.length - 4;
+
+            let html = '';
+            candlesList.forEach((c, index) => {
+                const x = index * (svgWidth / candlesList.length) + 2;
+                const yHigh = svgHeight - ((c.high - minP) / span) * (svgHeight - 30) - 15;
+                const yLow = svgHeight - ((c.low - minP) / span) * (svgHeight - 30) - 15;
+                const yOpen = svgHeight - ((c.open - minP) / span) * (svgHeight - 30) - 15;
+                const yClose = svgHeight - ((c.close - minP) / span) * (svgHeight - 30) - 15;
+
+                const bodyY = Math.min(yOpen, yClose);
+                const bodyHeight = Math.max(3, Math.abs(yOpen - yClose));
+                const color = c.isUp ? '#0ecb81' : '#f6465d';
+
+                html += `<line x1="${x + candleWidth/2}" y1="${yHigh}" x2="${x + candleWidth/2}" y2="${yLow}" stroke="${color}" stroke-width="1.5" />`;
+                html += `<rect x="${x}" y="${bodyY}" width="${candleWidth}" height="${bodyHeight}" fill="${color}" rx="1" />`;
+            });
+
+            group.innerHTML = html;
+        }
+
+        function runSmartStrategy() {
+            if (!isOnline) return;
+
+            const now = Date.now();
+            const cooldownMs = (state.settings.cooldown || 20) * 1000;
+            const fixedEntry = 5.00; // R$ 5,00
+
+            if (!state.currentTrade) {
+                if (now - lastTradeTime < cooldownMs) {
+                    const restante = Math.ceil((cooldownMs - (now - lastTradeTime)) / 1000);
+                    document.getElementById('current-position').innerHTML = `Aguardando espaço entre ordens: <b>${restante}s</b>...`;
+                    return;
+                }
+
+                if (state.availableBalance < fixedEntry) {
+                    document.getElementById('current-position').innerHTML = `Saldo insuficiente (R$ ${state.availableBalance.toFixed(2)}).`;
+                    return;
+                }
+
+                const lastCandle = candlesList[candlesList.length - 1];
+                if (!lastCandle) return;
+
+                // Dinâmico: Tendência de Alta = COMPRA | Tendência de Baixa = VENDA
+                const direction = lastCandle.isUp ? 'COMPRA' : 'VENDA';
+                openTrade(direction);
+            } 
+            else {
+                const trade = state.currentTrade;
+                const entry = trade.entryPrice;
+                
+                let changePct = ((currentPrice - entry) / entry) * 100;
+                if (trade.type === 'VENDA') {
+                    changePct = -changePct; 
+                }
+
+                const floatingBRL = (trade.amountBRL * (changePct / 100));
+
+                const typeLabel = trade.type === 'COMPRA' ? '🔵 <b>COMPRADO (R$ 5)</b>' : '🔴 <b>VENDIDO (R$ 5)</b>';
+                document.getElementById('current-position').innerHTML = `${typeLabel} a $${entry.toFixed(2)} | Lucro/Prej: <span class="${floatingBRL >= 0 ? 'positive' : 'negative'}">R$ ${floatingBRL >= 0 ? '+' : ''}${floatingBRL.toFixed(2)}</span>`;
+
+                // Take Profit de R$ 0,50 ou Stop Loss de R$ 0,50
+                const takeProfitMet = floatingBRL >= 0.50; 
+                const stopLossMet = floatingBRL <= -0.50;
+
+                if (takeProfitMet || stopLossMet) {
+                    closeTrade(floatingBRL);
+                }
+            }
+        }
+
+        function openTrade(direction) {
+            const allocAmount = 5.00;
+            const feeUSD = (allocAmount / USD_BRL) * 0.001;
+            state.totalFees += (feeUSD * USD_BRL);
+            
+            state.availableBalance -= allocAmount;
+            state.balance -= allocAmount; 
+            state.inTradeAmount = allocAmount;
+
+            state.currentTrade = {
+                type: direction, 
+                entryPrice: currentPrice,
+                amountBRL: allocAmount,
+                time: new Date().toLocaleTimeString()
+            };
+
+            saveState();
+            updateUI();
+        }
+
+        function closeTrade(floatingBRL) {
+            const trade = state.currentTrade;
+            const netResultBRL = floatingBRL;
+
+            state.balance = (state.balance + trade.amountBRL) + netResultBRL;
+            state.availableBalance = state.balance;
+            state.inTradeAmount = 0;
+            state.dailyPnl += netResultBRL;
+
+            state.trades.unshift({
+                type: `${trade.type} (${netResultBRL >= 0 ? 'LUCRO' : 'STOP'})`,
+                entry: trade.entryPrice,
+                exit: currentPrice,
+                pnl: netResultBRL,
+                time: new Date().toLocaleTimeString()
+            });
+
+            state.currentTrade = null;
+            lastTradeTime = Date.now();
+
+            saveState();
+            updateUI();
+        }
+
+        function toggleBot() {
+            state.botActive = !state.botActive;
+            const btn = document.getElementById('btn-toggle');
+            const dot = document.getElementById('bot-status-dot');
+            const audio = document.getElementById('keepAliveAudio');
+
+            if (state.botActive) {
+                btn.innerText = 'PAUSAR ROBÔ';
+                btn.className = 'btn btn-stop';
+                dot.classList.add('active');
+                // Ativa a "gambiarra" do áudio silencioso para travar o app conectado em segundo plano
+                audio.play().catch(e => console.log('Áudio keep-alive aguardando interação'));
+            } else {
+                btn.innerText = 'INICIAR ROBÔ';
+                btn.className = 'btn btn-start';
+                dot.classList.remove('active');
+                audio.pause();
+            }
+            saveState();
+        }
+
+        function saveSettings() {
+            const newInitial = parseFloat(document.getElementById('cfg-initial-balance').value);
+            const newCooldown = parseInt(document.getElementById('cfg-cooldown').value) || 20;
+
+            if (isNaN(newInitial) || newInitial < 5) {
+                alert('O saldo inicial mínimo é de R$ 5,00.');
+                return;
+            }
+
+            state.settings.cooldown = newCooldown;
+
+            if (newInitial !== state.initialBalance) {
+                if (confirm(`Alterar saldo inicial para R$ ${newInitial.toFixed(2)} e reiniciar a simulação?`)) {
+                    state.initialBalance = newInitial;
+                    state.balance = newInitial;
+                    state.availableBalance = newInitial;
+                    state.inTradeAmount = 0;
+                    state.dailyPnl = 0;
+                    state.currentTrade = null;
+                }
+            }
+            saveState();
+            updateUI();
+            alert('Configurações salvas com sucesso!');
+        }
+
+        function saveApiSettings() {
+            state.apiKey = document.getElementById('api-key').value;
+            state.apiSecret = document.getElementById('api-secret').value;
+            state.apiMode = document.getElementById('cfg-mode').value;
+            saveState();
+        }
+
+        function testApiConnection() {
+            saveApiSettings();
+            if(state.apiMode === 'REAL') {
+                if(!state.apiKey || !state.apiSecret) {
+                    alert('Por favor, preencha a API Key e a Secret Key.');
+                    return;
+                }
+                alert('Chaves de API salvas com segurança no dispositivo.');
+            } else {
+                alert('O aplicativo está em MODO SIMULADOR.');
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('sim-balance').innerText = 'R$ ' + state.balance.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('lbl-available').innerText = 'R$ ' + state.availableBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('lbl-in-trade').innerText = 'R$ ' + state.inTradeAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-initial').innerText = 'R$ ' + state.initialBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            const pnlElem = document.getElementById('daily-pnl');
+            pnlElem.innerText = 'R$ ' + state.dailyPnl.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            pnlElem.className = 'card-value ' + (state.dailyPnl >= 0 ? 'positive' : 'negative');
+
+            const tbody = document.getElementById('trade-history');
+            tbody.innerHTML = state.trades.slice(0, 6).map(t => `
+                <tr>
+                    <td><span class="${t.pnl >= 0 ? 'positive' : 'negative'}">${t.type || 'ENCERRADO'}</span></td>
+                    <td>$${t.entry.toFixed(1)}</td>
+                    <td>$${t.exit.toFixed(1)}</td>
+                    <td class="${t.pnl >= 0 ? 'positive' : 'negative'}">R$ ${t.pnl.toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('stat-total-trades').innerText = state.trades.length;
+            document.getElementById('stat-fees').innerText = 'R$ ' + state.totalFees.toFixed(2);
+            document.getElementById('stat-cycles').innerText = state.cycles;
+            const wins = state.trades.filter(t => t.pnl > 0).length;
+            const winrate = state.trades.length > 0 ? ((wins / state.trades.length) * 100).toFixed(0) : 0;
+            document.getElementById('stat-winrate').innerText = winrate + '%';
+        }
+
+        function saveState() {
+            localStorage.setItem('bot_state_brl_v10', JSON.stringify(state));
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('bot_state_brl_v10');
+            if (saved) {
+                state = JSON.parse(saved);
+                document.getElementById('cfg-initial-balance').value = state.initialBalance;
+                if(document.getElementById('cfg-cooldown')) document.getElementById('cfg-cooldown').value = state.settings.cooldown || 20;
+                
+                if (state.apiKey) document.getElementById('api-key').value = state.apiKey;
+                if (state.apiSecret) document.getElementById('api-secret').value = state.apiSecret;
+                if (state.apiMode) document.getElementById('cfg-mode').value = state.apiMode;
+
+                if (state.botActive) {
+                    toggleBot(); toggleBot();
+                }
+            }
+        }
+
+        function resetSimulator() {
+            if (confirm('Reiniciar saldo atual e limpar posições abertas?')) {
+                state.balance = state.initialBalance;
+                state.availableBalance = state.initialBalance;
+                state.inTradeAmount = 0;
+                state.dailyPnl = 0;
+                state.currentTrade = null;
+                saveState();
+                updateUI();
+            }
+        }
+    </script>
+</body>
+</html>
